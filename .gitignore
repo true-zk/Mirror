@@ -1,0 +1,6 @@
+__pychache__
+_example_data
+embed_model/*
+storage/*
+*.db
+draft.py
