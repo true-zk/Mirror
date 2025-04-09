@@ -1,10 +1,14 @@
 from typing import Optional, List, Dict
-import requests
 from datetime import datetime
+from pydantic import BaseModel
+import requests
 import pandas as pd
 import sqlite3
 
+from llama_index.core.tools import FunctionTool, ToolMetadata
+
 from .base import BasePlugin
+
 
 class CloudMusicPlugin(BasePlugin):
     url = "https://music.163.com/api/v1/play/record"
@@ -249,16 +253,6 @@ class CloudMusicPlugin(BasePlugin):
         return df.to_dict("records")
 
     # Llama index functions
-    @property
-    def name(self) -> str:
-        """插件的名称"""
-        return "网易云音乐插件"
-
-    @property
-    def description(self) -> str:
-        """插件的描述"""
-        return "获取今天的网易云音乐的听歌记录"
-
     def get_prompt(self) -> str:
         """获取今天的听歌记录，并写成一个LLM可以理解的格式
         会先调用 _parse_daily_records() 来更新数据库"""
@@ -293,3 +287,18 @@ class CloudMusicPlugin(BasePlugin):
         except sqlite3.Error as e:
             print(f"Query error: {e}")
             return ""
+    
+    def get_tool(self) -> FunctionTool:
+
+        class CloudMusicSchema(BaseModel):
+            pass
+
+        metadata = ToolMetadata(
+            name="get_today_cloud_music_record",
+            description="获取用户今天的网易云音乐的听歌记录",
+            fn_schema=CloudMusicSchema
+        )
+        return FunctionTool(
+            fn=self.get_prompt,
+            metadata=metadata
+        )
