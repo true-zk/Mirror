@@ -7,7 +7,7 @@ import sqlite3
 
 from llama_index.core.tools import FunctionTool, ToolMetadata
 
-from .base import BasePlugin
+from mirror.plugs.base import BasePlugin
 
 
 class CloudMusicPlugin(BasePlugin):
@@ -252,8 +252,8 @@ class CloudMusicPlugin(BasePlugin):
         df = self.query_records(today, top_n=n)
         return df.to_dict("records")
 
-    # Llama index functions
-    def get_prompt(self) -> str:
+    # Base Plugin functions ###################################
+    async def get_prompt(self) -> str:
         """获取今天的听歌记录，并写成一个LLM可以理解的格式
         会先调用 _parse_daily_records() 来更新数据库"""
         def _gen_prompt(records) -> str:
@@ -287,7 +287,7 @@ class CloudMusicPlugin(BasePlugin):
         except sqlite3.Error as e:
             print(f"Query error: {e}")
             return ""
-    
+
     def get_tool(self) -> FunctionTool:
 
         class CloudMusicSchema(BaseModel):
@@ -295,10 +295,38 @@ class CloudMusicPlugin(BasePlugin):
 
         metadata = ToolMetadata(
             name="get_today_cloud_music_record",
-            description="获取用户今天的网易云音乐的听歌记录",
+            description=(
+                "用于获取用户今天的网易云音乐听歌记录。"
+                "调用此工具时不需要任何参数，返回值是一个字符串,"
+                "包含用户今日听的歌曲名称、歌手、专辑和播放次数的列表。"
+                "适用于当需要获取『用户今天听歌记录』或类似信息时使用。"
+            ),
             fn_schema=CloudMusicSchema
         )
         return FunctionTool(
             fn=self.get_prompt,
             metadata=metadata
         )
+
+
+# a = CloudMusicPlugin(
+#     user_id="372411683",
+#     MUSIC_U="00F1ABD600CC1AEE1CF6CE73D87CD131CF2D6AD4667089FB668663BE4DB516AABBCA3EEA7374EC1365EDAEAF210FFA6B2FCDC5ECE85B8E70D3784AD8533FCEC68F3097361B8097BE461ABCCA1E20885F5D3C37CDC0A7ED126CB61D47CC020719FF60EFD4049C1AD95C322F71BC9191D9957EE5E787286669A07EFAB41638ACDAFF2AAC77AEAD92AAA75B30BBAD9237220AD35411706EF55E6DE97A876A3CADD7D2AF0538E86E28E05FF683F5BB3EA30A052F3B164F45C0AE367170589F41890E0E5957C7D76E4E903305AA6E6B6B63A241F46D701AEF71D4CA89908714F990D3C40E9575F47D1183ACE81B627230D465B159C0B475D522BCD5BE1C206F3DCF714ADF3D4C68DC13010AB66E282BB619899BDFAA6B2112D3DB278127C19641866E9FDB3A8E6FFA93585826B085421F7474AECF39B068DBB738BAA5E626A3F881C48DC7ABD27CA6AAF25663C653B9204E8D60C37C1087236C9F438564E0411ED0370CA175002246185D6BDC34BD0304C72E142D8EC5F4E0A6542C39EDBBA7B6FE07D5",
+#     csrf="3a5df4d81cde9da83e9708300754bf17"
+# )
+
+# tool = a.get_tool()
+
+# res1 = tool.call()
+# print("res1", res1)
+
+# print('xxxxxx')
+# async def test():
+#     res2 = await tool.acall()
+#     print("res2", res2)
+#     print("ok")
+
+# import asyncio
+# asyncio.run(test())
+
+# print('xxxxxx')
