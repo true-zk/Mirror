@@ -1,8 +1,11 @@
 from typing import Optional
+import os
 from pprint import pprint
 from pathlib import Path
 import requests
 from datetime import datetime
+from functools import partial
+from colorama import Fore, Style
 
 from llama_index.core.agent.workflow import (
     AgentWorkflow,
@@ -11,12 +14,38 @@ from llama_index.core.agent.workflow import (
     ToolCall
     )
 from llama_index.core.agent.workflow import AgentWorkflow
-from llama_index.core import VectorStoreIndex, StorageContext, SimpleVectorStore
-# https://docs.llamaindex.ai/en/stable/community/integrations/vector_stores/#using-a-vector-store-as-an-index
-from mirror.conf import PERSIST_DIR
+from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader
+from llama_index.core.retrievers import VectorIndexRetriever
+from llama_index.core.vector_stores import SimpleVectorStore
+from llama_index.core.storage.docstore import SimpleDocumentStore
+from llama_index.core.schema import Document
+from llama_index.core.vector_stores import MetadataFilters, MetadataFilter
+from llama_index.core.query_engine import RetrieverQueryEngine
+
+from mirror.conf import PERSIST_DIR, DIARY_DIR
+from mirror.models import bge_embedding_model, openai_like_llm
 
 
 # Basic utils
+def print_color(text: str, color: str = "green") -> None:
+    r"""Print text in color."""
+    colors = {
+        "red": Fore.RED,
+        "green": Fore.GREEN,
+        "yellow": Fore.YELLOW,
+        "blue": Fore.BLUE,
+        "magenta": Fore.MAGENTA,
+        "cyan": Fore.CYAN,
+        "white": Fore.WHITE,
+    }
+    print(colors.get(color, Fore.WHITE) + text + Style.RESET_ALL)
+
+
+danger_print = partial(print_color, color="red")
+warning_print = partial(print_color, color="yellow")
+success_print = partial(print_color, color="green")
+
+
 def get_date_location_weather() -> dict:
     # Today
     today = datetime.now().strftime("%Y年-%m月-%d日")
@@ -43,12 +72,69 @@ def get_date_location_weather() -> dict:
     }
 
 
-# Store utils
-def get_vec_store():
-    store_path = Path(PERSIST_DIR)
-    if not store_path.exists():
-        store_path.mkdir(parents=True, exist_ok=True)
-    storage_context = StorageContext.from_defaults(persist_dir=str(store_path))
+def iso_date(date_str: str) -> str:
+    return datetime.strptime(date_str, "%Y-%m-%d").isoformat()
+
+
+# Save Load and Index utils
+def save_diary(diary: str, file_name: str) -> None:
+    r"""Save the diary to the local file."""
+    if not file_name.endswith(".md"):
+        file_name += ".md"
+    with open(os.path.join(DIARY_DIR, file_name), "w") as f:
+        f.write(diary + "\n\n")
+
+
+def get_index(force_load: bool = False) -> VectorStoreIndex:
+    r"""Return the diary index.
+    If set `force_load` to True, it will build the index from the diary doc.
+    """
+    index_path = Path(PERSIST_DIR)
+    storage_context = StorageContext.from_defaults(
+        docstore=SimpleDocumentStore.from_persist_dir(PERSIST_DIR),
+        vector_store=SimpleVectorStore.from_persist_dir(PERSIST_DIR),
+        persist_dir=PERSIST_DIR
+    )
+    if index_path.exists() and not force_load:
+        index = VectorStoreIndex.from_vector_store(
+                vector_store=storage_context.vector_store,
+                embed_model=bge_embedding_model()
+            )
+        return index
+    else:
+        storage_context.persist(persist_dir=PERSIST_DIR)
+        index = VectorStoreIndex([], embed_model=bge_embedding_model())
+        return index
+
+
+def insert_diary_to_index(index: VectorStoreIndex, diary_doc: Document) -> None:
+    r"""Insert the diary Document to the index."""
+    index.insert(diary_doc)
+    index.storage_context.persist(persist_dir=PERSIST_DIR)
+
+
+def query_by_time(start: datetime, end: datetime) -> VectorIndexRetriever:
+    r"""Query the diary index by time."""
+    filters = MetadataFilters(
+        filters=[
+            MetadataFilter(
+                key="date", 
+                value=start.isoformat(),
+                operator=">="
+            ),
+            MetadataFilter(
+                key="date", 
+                value=end.isoformat(),
+                operator="<="
+            )
+        ]
+    )
+    return get_index().as_retriever(filters=filters)
+
+
+def query_by_content(query: str, top_k: int = 5):
+    r"""Query the diary index by content."""
+    return get_index().as_retriever(similarity_top_k=top_k)
 
 
 # Workflow utils

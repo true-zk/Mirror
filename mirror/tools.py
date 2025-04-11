@@ -1,10 +1,18 @@
+import json
+from datetime import datetime
+
 from llama_index.core.workflow import Context
-from llama_index.core.tools import FunctionTool
+from llama_index.core.tools import FunctionTool, QueryEngineTool
 from llama_index.tools.tavily_research import TavilyToolSpec
+from llama_index.core.query_engine import BaseQueryEngine
 
 from mirror.conf import CLOUD_MUSIC, User
 from mirror.plugs import CloudMusicPlugin
-from mirror.utils import get_date_location_weather
+from mirror.utils import (
+    get_date_location_weather,
+    query_by_time,
+    query_by_content
+)
 
 
 ####################Diary Generator tools#####################
@@ -85,3 +93,29 @@ async def review_diary(ctx: Context, review: str) -> str:
     current_state["review"] = review
     await ctx.set("state", current_state)
     return "Diary reviewed."
+
+
+####################Diary Summary tools#####################
+
+async def time_query_handler(query_str: str) -> str:
+    try:
+        params = json.loads(query_str)
+        start = datetime.fromisoformat(params["start"])
+        end = datetime.fromisoformat(params["end"])
+
+        query_engine = query_by_time(start, end)
+        return await query_engine.aquery(query_str)
+    except (json.JSONDecodeError, KeyError) as e:
+        return f"参数错误：{str(e)}，请使用正确格式：{{'start': 'YYYY-MM-DD', 'end': 'YYYY-MM-DD'}}"
+    except Exception as e:
+        return f"查询失败：{str(e)}"
+
+
+# 有问题
+# time_query_tool = QueryEngineTool.from_defaults(
+#     query_engine=time_query_handler,
+#     name="diary_time_query",
+#     description="""根据时间范围检索日记，输入应为JSON格式：
+#     {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}""",
+#     tool_metadata={"type": "time_range_query"}
+# )

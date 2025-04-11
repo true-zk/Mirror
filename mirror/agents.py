@@ -41,7 +41,6 @@ websearch_and_record_agent = FunctionAgent(
         "然后将增强数据使用工具记录到上下文状态。\n"
         "注意：\n"
         "你只能调用2次网络搜索工具。\n"
-        "需要的时候是指你不能理解这个信息，或者你认为这个信息不完整。\n"
     ),
     llm=llm,
     tools=[web_search_tool, record_enhanced_data],
@@ -90,4 +89,13 @@ review_diary_agent = FunctionAgent(
 
 
 ####################Diary Summary agents#####################
-
+# diary_summary_agent = FunctionAgent(
+#     name="DiarySummaryAgent",
+#     description="用于根据用户的历史日记内容进行总结。",
+#     system_prompt=(
+#         "你是一个个人日记总结助手。你的任务是：\n"
+#         ""
+#     ),
+#     llm=llm,
+#     tools=[],
+# )
