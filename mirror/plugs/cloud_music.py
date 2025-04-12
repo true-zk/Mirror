@@ -15,6 +15,8 @@ class CloudMusicPlugin(BasePlugin):
     url = "https://music.163.com/api/v1/play/record"
     day_table = "day_history"
     week_table = "week_history"
+    prompt_head = "用户今天的网易云音乐听歌记录如下：\n"
+    prompt_tail = "用户今天共听了{count}首歌。\n"
 
     def __init__(
         self,
@@ -257,14 +259,15 @@ class CloudMusicPlugin(BasePlugin):
     async def get_prompt(self) -> str:
         """获取今天的听歌记录，并写成一个LLM可以理解的格式
         会先调用 _parse_daily_records() 来更新数据库"""
-        def _gen_prompt(records) -> str:
-            prompt = "用户今天的听歌记录：\n"
+        def _gen_prompt(records: list) -> str:
+            prompt = self.prompt_head
             for i, record in enumerate(records):
                 prompt += f"第{i+1}首："
                 prompt += f"歌曲：{record['name']} "
                 prompt += f"歌手：{record['artist']} "
                 prompt += f"专辑：{record['album']} "
                 prompt += f"播放次数：{record['play_count']} \n"
+            prompt += self.prompt_tail.format(count=len(records))
             return prompt
 
         self._parse_daily_records()
@@ -295,13 +298,8 @@ class CloudMusicPlugin(BasePlugin):
             pass
 
         metadata = ToolMetadata(
-            name="get_today_cloud_music_record",
-            description=(
-                "用于获取用户今天的网易云音乐听歌记录。"
-                "调用此工具时不需要任何参数，返回值是一个字符串,"
-                "包含用户今日听的歌曲名称、歌手、专辑和播放次数的列表。"
-                "适用于当需要获取『用户今天听歌记录』或类似信息时使用。"
-            ),
+            name="get_today_cloud_music_listening_record",
+            description="用于获取用户今天的网易云音乐听歌记录",
             fn_schema=CloudMusicSchema
         )
         return FunctionTool(
