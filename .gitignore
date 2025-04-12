@@ -1,6 +1,9 @@
-__pycache__/
+**/__pycache__/
 trash/
-embed_model/*
-storage/*
+embed_model/
+embed_cache/
+store/
+_test/
+.gradio/
 *.db
 draft.py

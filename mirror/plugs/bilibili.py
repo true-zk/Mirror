@@ -5,10 +5,10 @@ from pydantic import BaseModel
 from llama_index.core.tools import FunctionTool, ToolMetadata
 
 from mirror.plugs.base import BasePlugin
-# from mirror.utils import # TODO
+from mirror.utils import danger_print, warning_print
 
 
-class CloudMusicPlugin(BasePlugin):
+class BilibliPlugin(BasePlugin):
     url = "https://api.bilibili.com/x/web-interface/history/cursor?max={max_id}&view_at={view_at}&business=archive"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -38,7 +38,7 @@ class CloudMusicPlugin(BasePlugin):
                 response = requests.get(url, headers=self.headers, timeout=10)
                 data = response.json()
             except Exception as e:
-                print(f"Error fetching data: {e}")
+                danger_print(f"Error fetching data: {e}")
                 break
 
             if data["code"] != 0 or not data.get("data"):
@@ -90,6 +90,7 @@ class CloudMusicPlugin(BasePlugin):
 
         history_list = self._fetch_parse_today_his()
         if not history_list:
+            warning_print("No Bilibili watch history today.")
             return "No Bilibili watch history today."
 
         return _gen_prompt(history_list)

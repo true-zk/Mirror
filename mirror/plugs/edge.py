@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from llama_index.core.tools import FunctionTool, ToolMetadata
 
 from mirror.plugs.base import BasePlugin
+from mirror.utils import danger_print, warning_print
 
 
 class EdgePlugin(BasePlugin):
@@ -25,13 +26,13 @@ class EdgePlugin(BasePlugin):
 
     def _is_his_readable(self):
         if not os.path.exists(self.history_path):
-            print("History file does not exist.")
+            danger_print("History file does not exist.")
             return False
         try:
             with open(self.history_path, 'r'):
                 return True
         except IOError:
-            print("History file is not accessible.")
+            danger_print("History file is not accessible.")
             return False
 
     def _get_today_history(self):
@@ -70,6 +71,7 @@ class EdgePlugin(BasePlugin):
         records = self._get_today_history()
         prompt = self.prompt_head
         if not records:
+            warning_print("No Edge history records found.")
             prompt += "今天没有浏览记录。\n"
             return prompt
         for title, (visit_time, visit_count, url) in records.items():

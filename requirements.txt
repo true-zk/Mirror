@@ -1,2 +1,3 @@
+llama-index
 llama-index-tools-tavily-research
 dateparser

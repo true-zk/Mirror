@@ -1,29 +1,19 @@
-from typing import Optional
 import os
-from pprint import pprint
-from pathlib import Path
-import requests
-from datetime import datetime
+import re
+import dateparser.search
+import dateparser
+from typing import Optional, Tuple
 from functools import partial
+from datetime import datetime, timedelta
+from pprint import pprint
 from colorama import Fore, Style
 
 from llama_index.core.agent.workflow import (
     AgentWorkflow,
     AgentOutput,
     ToolCallResult,
-    ToolCall
+    ToolCall,
     )
-from llama_index.core.agent.workflow import AgentWorkflow
-from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader
-from llama_index.core.retrievers import VectorIndexRetriever
-from llama_index.core.vector_stores import SimpleVectorStore
-from llama_index.core.storage.docstore import SimpleDocumentStore
-from llama_index.core.schema import Document
-from llama_index.core.vector_stores import MetadataFilters, MetadataFilter
-from llama_index.core.query_engine import RetrieverQueryEngine
-
-from mirror.conf import PERSIST_DIR, DIARY_DIR
-from mirror.models import bge_embedding_model, openai_like_llm
 
 
 # Basic utils
@@ -46,95 +36,76 @@ warning_print = partial(print_color, color="yellow")
 success_print = partial(print_color, color="green")
 
 
-def get_date_location_weather() -> dict:
-    # Today
-    today = datetime.now().strftime("%Y年-%m月-%d日")
-
-    # Location from IP address
-    ip_response = requests.get('https://ipinfo.io/json')
-    location_data = ip_response.json()
-    city = location_data.get('city', 'Unknown')
-    country = location_data.get('country', 'Unknown')
-
-    # OpenWeatherMap API
-    # TODO: Hard code here
-    WEATHER_API_KEY = "29e7696c3b1a8c6de55d8ecc2685ae31"
-    weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}"
-    weather_data = str(requests.get(weather_url).json())
-
-    description = weather_data["weather"][0]["description"]
-    temp = str(round(weather_data["main"]["temp"] - 273.15, 1)) + "°C"
-
-    return {
-        "date": today,
-        "location": f"{city}, {country}",
-        "weather": f"天气为 {description}，温度为 {temp}",
-    }
-
-
-def iso_date(date_str: str) -> str:
-    return datetime.strptime(date_str, "%Y-%m-%d").isoformat()
-
-
-# Save Load and Index utils
-def save_diary(diary: str, file_name: str) -> None:
-    r"""Save the diary to the local file."""
-    if not file_name.endswith(".md"):
-        file_name += ".md"
-    with open(os.path.join(DIARY_DIR, file_name), "w") as f:
-        f.write(diary + "\n\n")
-
-
-def get_index(force_load: bool = False) -> VectorStoreIndex:
-    r"""Return the diary index.
-    If set `force_load` to True, it will build the index from the diary doc.
+def extract_date_range_from_prompt(prompt: str) -> Tuple[Optional[str], Optional[str]]:
     """
-    index_path = Path(PERSIST_DIR)
-    storage_context = StorageContext.from_defaults(
-        docstore=SimpleDocumentStore.from_persist_dir(PERSIST_DIR),
-        vector_store=SimpleVectorStore.from_persist_dir(PERSIST_DIR),
-        persist_dir=PERSIST_DIR
-    )
-    if index_path.exists() and not force_load:
-        index = VectorStoreIndex.from_vector_store(
-                vector_store=storage_context.vector_store,
-                embed_model=bge_embedding_model()
+    自动从 prompt 中提取自然语言日期范围，并转换为 "YYYY-MM-DD" 格式
+    """
+    # Normalize
+    prompt = prompt.lower().strip()
+    start_dt = datetime(1601, 1, 1)
+    end_dt = datetime.now()
+
+    # Match 形式：从XX到XX / XX到XX
+    match = re.search(r"(从)?(.+?)(到|至)(.+?)(的)?", prompt)
+    if match:
+        start_expr = match.group(2).strip()
+        end_expr = match.group(4).strip()
+        start_dt = dateparser.parse(start_expr)
+        end_dt = dateparser.parse(end_expr)
+        if start_dt and end_dt:
+            return (
+                start_dt.strftime("%Y-%m-%d"),
+                end_dt.strftime("%Y-%m-%d"),
             )
-        return index
-    else:
-        storage_context.persist(persist_dir=PERSIST_DIR)
-        index = VectorStoreIndex([], embed_model=bge_embedding_model())
-        return index
 
+    # 单点日期，如“昨天”、“今天”、“三天前”
+    single_expr = re.search(r"(本周|这周|这星期|今天|今天之前|之前|昨天|前天|上周|上星期|上个月|最近几天|几天前|几天内|过去几天|最近)", prompt)
+    if single_expr:
+        base_dt = datetime.now()
+        expr = single_expr.group(1)
 
-def insert_diary_to_index(index: VectorStoreIndex, diary_doc: Document) -> None:
-    r"""Insert the diary Document to the index."""
-    index.insert(diary_doc)
-    index.storage_context.persist(persist_dir=PERSIST_DIR)
+        if expr in ["昨天"]:
+            dt = base_dt.replace(hour=0, minute=0, second=0) - timedelta(days=1)
+            return dt.strftime("%Y-%m-%d"), dt.strftime("%Y-%m-%d")
 
+        if expr in ["今天"]:
+            dt = base_dt.replace(hour=0, minute=0, second=0)
+            return dt.strftime("%Y-%m-%d"), dt.strftime("%Y-%m-%d")
 
-def query_by_time(start: datetime, end: datetime) -> VectorIndexRetriever:
-    r"""Query the diary index by time."""
-    filters = MetadataFilters(
-        filters=[
-            MetadataFilter(
-                key="date", 
-                value=start.isoformat(),
-                operator=">="
-            ),
-            MetadataFilter(
-                key="date", 
-                value=end.isoformat(),
-                operator="<="
-            )
-        ]
-    )
-    return get_index().as_retriever(filters=filters)
+        if expr in ["今天之前", "之前"]:
+            dt = base_dt.replace(hour=0, minute=0, second=0)
+            return start_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d")
 
+        if expr in ["本周", "这周", "这星期"]:
+            start = base_dt - timedelta(days=base_dt.weekday())
+            end = start + timedelta(days=6)
+            return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
 
-def query_by_content(query: str, top_k: int = 5):
-    r"""Query the diary index by content."""
-    return get_index().as_retriever(similarity_top_k=top_k)
+        if expr in ["上周", "上星期"]:
+            start = base_dt - timedelta(days=base_dt.weekday() + 7)
+            end = start + timedelta(days=6)
+            return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+        if expr in ["上个月"]:
+            first_day_this_month = base_dt.replace(day=1)
+            last_month_end = first_day_this_month - timedelta(days=1)
+            start = last_month_end.replace(day=1)
+            return start.strftime("%Y-%m-%d"), last_month_end.strftime("%Y-%m-%d")
+
+        if expr in ["最近几天", "几天前", "几天内", "过去几天"]:
+            end = base_dt
+            start = base_dt - timedelta(days=3)
+            return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+    # 全局自然语言 parse
+    parsed = dateparser.search.search_dates(prompt, settings={"RELATIVE_BASE": datetime.now(), "PREFER_DATES_FROM": "past"})
+    if parsed:
+        parsed_dates = sorted([dt for _, dt in parsed])
+        start = parsed_dates[0].strftime("%Y-%m-%d")
+        end = parsed_dates[-1].strftime("%Y-%m-%d")
+        return start, end
+
+    return None, None
 
 
 # Workflow utils
@@ -145,43 +116,46 @@ def prompt_arg_parser(prompt: str, prompt_args: Optional[dict]) -> str:
     return prompt
 
 
-async def cmdoutput_agent_workflow1(
+async def async_run_workflow(
     workflow: AgentWorkflow,
     prompt: str,
     prompt_args: Optional[dict] = None,
-):
-    r"""Cmd print output for agent workflow with details."""
-
-    print("🙁 Warning: cmd output run does not save any data.")
-    print("🧪 This should only be used for testing.")
+    verbose: bool = False,
+) -> dict:
+    r"""Async run workflow and return the final state."""
 
     prompt = prompt_arg_parser(prompt, prompt_args)
-    pprint(f"💬 User: {prompt}")
+    if verbose:
+        pprint(f"💬 User: {prompt}")
 
     handler = workflow.run(user_msg=prompt)
 
-    cur_agent = None
-    async for event in handler.stream_events():
-        if (
-            hasattr(event, "current_agent_name")
-            and event.current_agent_name != cur_agent
-        ):
-            cur_agent = event.current_agent_name
-            print(f"\n{'='*50}")
-            print(f"🤖 Agent: {cur_agent}")
-            print(f"{'='*50}\n")
-        elif isinstance(event, AgentOutput):
-            if event.response.content:
-                print(f"📝 Output: {event.response.content}")
-            if event.tool_calls:
-                print(
-                    f"🔧 Planning to use tools:",
-                    [tool_call.tool_name for tool_call in event.tool_calls]
-                )
-        elif isinstance(event, ToolCallResult):
-            print(f"🔧 Tool Result ({event.tool_name}):")
-            print(f"  Arguments: {event.tool_kwargs}")
-            print(f"  Output: {event.tool_output}")
-        elif isinstance(event, ToolCall):
-            print(f"🔨 Calling Tool: {event.tool_name}")
-            print(f"  Arguments: {event.tool_kwargs}")
+    if verbose:
+        cur_agent = None
+        async for event in handler.stream_events():
+            if (
+                hasattr(event, "current_agent_name")
+                and event.current_agent_name != cur_agent
+            ):
+                cur_agent = event.current_agent_name
+                print(f"\n{'='*50}")
+                print(f"🤖 Agent: {cur_agent}")
+                print(f"{'='*50}\n")
+            elif isinstance(event, AgentOutput):
+                if event.response.content:
+                    print(f"📝 Output: {event.response.content}")
+                if event.tool_calls:
+                    print(
+                        f"🔧 Planning to use tools:",
+                        [tool_call.tool_name for tool_call in event.tool_calls]
+                    )
+            elif isinstance(event, ToolCallResult):
+                print(f"🔧 Tool Result ({event.tool_name}):")
+                print(f"  Arguments: {event.tool_kwargs}")
+                print(f"  Output: {event.tool_output}")
+            elif isinstance(event, ToolCall):
+                print(f"🔨 Calling Tool: {event.tool_name}")
+                print(f"  Arguments: {event.tool_kwargs}")
+
+    final_state = await handler.ctx.get("state")
+    return final_state

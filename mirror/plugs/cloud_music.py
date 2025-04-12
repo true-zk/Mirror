@@ -8,7 +8,7 @@ import sqlite3
 from llama_index.core.tools import FunctionTool, ToolMetadata
 
 from mirror.plugs.base import BasePlugin
-from mirror.utils import danger_print
+from mirror.utils import danger_print, warning_print
 
 
 class CloudMusicPlugin(BasePlugin):
@@ -75,7 +75,7 @@ class CloudMusicPlugin(BasePlugin):
                 conn.executescript(create_table_sql2)
                 conn.commit()
         except sqlite3.Error as e:
-            print(f"DB init error: {e}")
+            danger_print(f"DB init error: {e}")
             raise
 
     def _save_to_day_table(self, df: pd.DataFrame) -> int:
@@ -150,7 +150,7 @@ class CloudMusicPlugin(BasePlugin):
                     conn.commit()
                     return cnt  # Return today record count
         except sqlite3.Error as e:
-            print(f"DB error: {e}")
+            danger_print(f"DB error: {e}")
             return -1
 
     def _get_weekly_records(self) -> Dict:
@@ -195,7 +195,7 @@ class CloudMusicPlugin(BasePlugin):
             ).reset_index()
             self._save_to_day_table(agg_df)
         else:
-            print("Warning: No new records to save.")
+            warning_print("Warning: No new records to save.")
 
     # Test functions
     def query_records(
@@ -286,10 +286,10 @@ class CloudMusicPlugin(BasePlugin):
                     records = df.to_dict("records")
                     return _gen_prompt(records)
                 else:
-                    print("No records found for today.")
-                    return ""
+                    warning_print("Cloud music: No records found for today.")
+                    return "用户今天没有听歌记录。\n"
         except sqlite3.Error as e:
-            print(f"Query error: {e}")
+            danger_print(f"Query error: {e}")
             return ""
 
     def get_tool(self) -> FunctionTool:
