@@ -17,18 +17,12 @@ EMBEDDING_MODEL_NAME = "BAAI/bge-small-zh-v1.5"
 PERSIST_DIR = "/{home}/mirror/store"
 DIARY_DIR = "/{home}/mirror/diary"
 
+# openweathermap api key
+WEATHER_API_KEY = ""
 
-WEATHER_API_KEY = "29e7696c3b1a8c6de55d8ecc2685ae31"
-
-
-# tavily
+# tavily api
 TAVILY_API_KEY = ""
 
-# Plugin
-PLUGIN_CTL = {
-    "enable": True,
-    "filter": [],
-}
 # cloud music
 CLOUD_MUSIC = {
     "user_id": "",
