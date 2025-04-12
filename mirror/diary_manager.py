@@ -14,7 +14,7 @@ from mirror.conf import PERSIST_DIR, DIARY_DIR
 from mirror.utils import (
     extract_date_range_from_prompt,
     success_print,
-    danger_print,
+    warning_print,
 )
 
 
@@ -29,10 +29,14 @@ class DiaryManager(metaclass=SingletonMeta):
         self.persist_dir = persist_dir
         self.storage_context = self._load_or_create_storage()
         self.index: VectorStoreIndex = self._load_or_create_index()
+        if not os.path.exists(self.diary_dir):
+            os.makedirs(self.diary_dir, exist_ok=True)
         success_print(
             "📖 日记管理器已初始化，日记存储在：" + self.diary_dir + " "
             "索引存储在：" + self.persist_dir
         )
+        self._instance = self
+        success_print("📖 日记管理器单例已创建。")
 
     def _load_or_create_storage(self) -> StorageContext:
         os.makedirs(self.persist_dir, exist_ok=True)
@@ -61,9 +65,9 @@ class DiaryManager(metaclass=SingletonMeta):
     def get_instance(cls) -> "DiaryManager":
         r"""Get the singleton instance of DiaryManager."""
         if cls._instance is None:
-            msg = "DiaryManager is not initialized. Please call __init__() first."
-            danger_print(msg)
-            raise ValueError(msg)
+            msg = "DiaryManager is not initialized, init now."
+            warning_print(msg)
+            cls._instance = cls()
         return cls._instance
 
     def add_diary(self, content: str, date: Optional[str] = None):

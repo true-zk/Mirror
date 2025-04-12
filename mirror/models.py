@@ -7,14 +7,28 @@ from mirror.conf import DASHSCOPE_KEY, CACHE_DIR, EMBED_MODEL_DIR
 
 
 # llms
+# def openai_like_llm(**kwargs):
+#     """Return the openai like llm."""
+#     openai_llm = OpenAILike(
+#         model="qwen-max",
+#         api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
+#         is_chat_model=True,
+#         is_function_calling_model=True,
+#         api_key=DASHSCOPE_KEY,
+#         **kwargs
+#     )
+#     return openai_llm
+
+
+from mirror.conf import LOCAL_LLM_KEY, LOCAL_LLM_URL
 def openai_like_llm(**kwargs):
     """Return the openai like llm."""
     openai_llm = OpenAILike(
-        model="qwen-max",
-        api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model="deepseek-chat",
+        api_base=LOCAL_LLM_URL,
         is_chat_model=True,
         is_function_calling_model=True,
-        api_key=DASHSCOPE_KEY,
+        api_key=LOCAL_LLM_KEY,
         **kwargs
     )
     return openai_llm

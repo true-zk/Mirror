@@ -89,6 +89,9 @@ class BilibliPlugin(BasePlugin):
             return prompt
 
         history_list = self._fetch_parse_today_his()
+        if len(history_list) > 10:
+            history_list = history_list[:10]
+            warning_print("Today's Bilibili watch history exceeds 10 records, only use first 10.")
         if not history_list:
             warning_print("No Bilibili watch history today.")
             return "No Bilibili watch history today."

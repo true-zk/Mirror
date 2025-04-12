@@ -69,6 +69,9 @@ class EdgePlugin(BasePlugin):
 
     async def get_prompt(self) -> str:
         records = self._get_today_history()
+        if len(records) > 10:
+            records = dict(list(records.items())[:10])
+            warning_print("Today's Edge history exceeds 10 records, only use first 10.")
         prompt = self.prompt_head
         if not records:
             warning_print("No Edge history records found.")

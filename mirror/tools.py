@@ -7,6 +7,8 @@ from llama_index.tools.tavily_research import TavilyToolSpec
 
 from mirror.conf import (
     User,
+    TAVILY_API_KEY,
+    WEATHER_API_KEY,
     CLOUD_MUSIC,
     BILIBILI,
     EDGE,
@@ -55,7 +57,6 @@ def get_date_location_weather() -> dict:
 
     # OpenWeatherMap API
     # TODO: Hard code here
-    WEATHER_API_KEY = "29e7696c3b1a8c6de55d8ecc2685ae31"
     weather_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}"
     weather_data = requests.get(weather_url).json()
 
@@ -100,8 +101,7 @@ async def collect_raw_data(ctx: Context) -> str:
 
 
 # 2. Web search tool from tavily and Record tool
-# TODO: rm hardcode
-web_search_tool = TavilyToolSpec(api_key="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")
+web_search_tool = TavilyToolSpec(api_key=TAVILY_API_KEY)
 web_search_tool = web_search_tool.to_tool_list()[0]
 # BUG (fixed) : original name "search" is invalid for some reason.
 web_search_tool.metadata.name = "search_web"

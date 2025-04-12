@@ -78,7 +78,7 @@ def extract_date_range_from_prompt(prompt: str) -> Tuple[Optional[str], Optional
 
         if expr in ["本周", "这周", "这星期"]:
             start = base_dt - timedelta(days=base_dt.weekday())
-            end = start + timedelta(days=6)
+            end = start + timedelta(days=7)
             return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
 
         if expr in ["上周", "上星期"]:

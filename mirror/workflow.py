@@ -30,7 +30,7 @@ workflow_1 = AgentWorkflow(
         "review": "Review required.",
     },
     state_prompt=(
-        "你是一个个人日记写作助手，"
+        "你是一个完全自动不需要用户介入的个人日记写作助手，"
         "你将根据当前的上下文信息帮助用户完成日记写作任务。\n\n"
         "当前状态信息：{state}，具体来说：\n"
         "📅 日期：{state[date]}\n"
@@ -65,7 +65,7 @@ workflow_2 = AgentWorkflow(
         "review": "Review required.",
     },
     state_prompt=(
-        "你是一个个人日记总结助手，"
+        "你是一个完全自动不需要用户介入个人日记总结助手，"
         "你将根据当前的上下文信息帮助用户完成总结任务。\n\n"
         "当前状态信息在：{state}，具体来说：\n"
         "本周日记内容 weekly_diary：{state[weekly_diary]}\n"

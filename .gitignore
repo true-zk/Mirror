@@ -2,6 +2,8 @@
 trash/
 embed_model/
 embed_cache/
+diary/
+storage/
 store/
 _test/
 .gradio/
